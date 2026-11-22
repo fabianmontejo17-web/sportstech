@@ -14,7 +14,10 @@ const publicoRoutes = require('./src/routes/publico.routes');
 
 const app = express();
 
-app.use(cors());
+app.use(cors({
+  origin: ['https://sportstech-eight.vercel.app', 'http://localhost:5173'],
+  credentials: true
+}));
 app.use(express.json());
 
 // Usar rutas
