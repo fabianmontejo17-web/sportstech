@@ -3,17 +3,33 @@ const router = express.Router();
 const db = require('../config/db');
 const authMiddleware = require('../middlewares/auth');
 
-// GET /api/equipos (Lista de equipos)
+// GET /api/equipos (Lista de equipos filtrados por torneo)
 router.get('/', authMiddleware, async (req, res) => {
+  const { torneo_id } = req.query; 
+
   try {
-    const [equipos] = await db.query(`
+    let query = `
       SELECT e.id, e.nombre, COUNT(je.jugador_id) AS jugadores
       FROM equipos e
       LEFT JOIN jugadores_equipo je ON e.id = je.equipo_id
-      GROUP BY e.id
-    `);
+    `;
+    let params = [];
+
+    // Si el frontend envía el torneo, filtramos solo los equipos inscritos en él
+    if (torneo_id) {
+      query += `
+        JOIN torneo_equipos te ON e.id = te.equipo_id
+        WHERE te.torneo_id = ?
+      `;
+      params.push(torneo_id);
+    }
+
+    query += ' GROUP BY e.id';
+    
+    const [equipos] = await db.query(query, params);
     res.json({ ok: true, equipos });
   } catch (error) {
+    console.error("Error al cargar equipos:", error);
     res.status(500).json({ ok: false, mensaje: 'Error al cargar equipos' });
   }
 });
@@ -49,7 +65,7 @@ router.post('/', authMiddleware, async (req, res) => {
       [nombre, colorPrincipal, 1]
     );
 
-    // 2. Inscribimos el equipo en el torneo (si viene el ID)
+    // 2. Inscribimos el equipo en el torneo actual
     if (torneoId) {
       await db.query(
         'INSERT INTO torneo_equipos (torneo_id, equipo_id) VALUES (?, ?)',
@@ -67,9 +83,10 @@ router.post('/', authMiddleware, async (req, res) => {
 // POST /api/equipos/:id/jugadores (Agregar jugador)
 router.post('/:id/jugadores', authMiddleware, async (req, res) => {
   const equipoId = req.params.id;
-  const { nombre, apellidos, fechaNacimiento, dorsal } = req.body;
+  const { nombre, apellidos, fechaNacimiento, dorsal, torneoId } = req.body;
 
   try {
+    // Verificamos si el dorsal ya está ocupado en ese equipo
     const [dorsalOcupado] = await db.query(
       'SELECT id FROM jugadores_equipo WHERE equipo_id = ? AND dorsal = ?',
       [equipoId, dorsal]
@@ -79,15 +96,16 @@ router.post('/:id/jugadores', authMiddleware, async (req, res) => {
       return res.status(400).json({ ok: false, mensaje: `El dorsal ${dorsal} ya está ocupado en este equipo` });
     }
 
+    // Insertamos al jugador
     const [resultJugador] = await db.query(
       'INSERT INTO jugadores (nombre, apellidos, fecha_nacimiento) VALUES (?, ?, ?)',
       [nombre, apellidos, fechaNacimiento || null]
     );
 
-    // Asumimos torneo_id = 1 para la inscripción del jugador
+    // Lo vinculamos al equipo y al torneo
     await db.query(
       'INSERT INTO jugadores_equipo (torneo_id, jugador_id, equipo_id, dorsal) VALUES (?, ?, ?, ?)',
-      [1, resultJugador.insertId, equipoId, dorsal]
+      [torneoId || 1, resultJugador.insertId, equipoId, dorsal]
     );
 
     res.json({ ok: true, mensaje: 'Jugador agregado' });
