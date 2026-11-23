@@ -15,7 +15,9 @@ export default function Calendario() {
   
   const { torneoActivo } = useTorneo();
 
+  // Carga de partidos
   useEffect(() => {
+    let isMounted = true; // <-- Evita el bucle si el componente se desmonta
     const cargarPartidos = async () => {
       if (!torneoActivo) return;
       
@@ -24,35 +26,35 @@ export default function Calendario() {
       try {
         const res = await api.getPartidos(jornada, torneoActivo.id);
         const data = res.partidos || res.data || res;
-        setPartidos(Array.isArray(data) ? data : []);
+        if (isMounted) setPartidos(Array.isArray(data) ? data : []);
       } catch (err) {
         console.error(err);
-        setError('Error al cargar el calendario');
+        if (isMounted) setError('Error al cargar el calendario');
       } finally {
-        setCargando(false);
+        if (isMounted) setCargando(false);
       }
     };
     cargarPartidos();
-  }, [jornada, torneoActivo]); // Se recarga al cambiar de jornada o torneo
+
+    return () => { isMounted = false; };
+  }, [jornada, torneoActivo]);
 
   return (
     <div className="pb-[80px]">
       <Encabezado titulo={`Calendario · ${torneoActivo?.nombre || 'Sin torneo'}`} />
       
-      {/* Selector de Jornada con botones */}
       <div className="flex items-center justify-between p-4 border-b-[3px] border-texto bg-gray-50">
         <button 
-          onClick={() => setJornada(prev => Math.max(1, prev - 1))} 
-          className={`p-2 min-w-[52px] min-h-[52px] flex justify-center items-center ${jornada === 1 ? 'opacity-30' : ''}`}
-          disabled={jornada === 1}
+          onClick={() => setJornada(jornada > 1 ? jornada - 1 : 1)} 
+          className="p-2 min-w-[52px] min-h-[52px] flex justify-center items-center"
         >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M15 18l-6-6 6-6"/></svg>
         </button>
         
-        <h2 className="text-lg font-bold">Jornada {String(jornada)}</h2>
+        <h2 className="text-lg font-bold">Jornada {jornada}</h2>
         
         <button 
-          onClick={() => setJornada(prev => prev + 1)} 
+          onClick={() => setJornada(jornada + 1)} 
           className="p-2 min-w-[52px] min-h-[52px] flex justify-center items-center"
         >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M9 18l6-6-6-6"/></svg>
@@ -75,7 +77,6 @@ export default function Calendario() {
             {partidos.map(partido => (
               <div key={partido.id} className="border-[3px] border-texto rounded-lg p-4">
                 <p className="font-bold text-lg mb-1">{partido.hora} · {partido.cancha}</p>
-                
                 {partido.estado === 'finalizado' || partido.estado === 'Finalizado' ? (
                   <div className="mt-4 bg-gray-100 p-3 rounded border-[2px] border-gray-300">
                     <p className="text-sm font-bold text-textoSec mb-2">Finalizado</p>

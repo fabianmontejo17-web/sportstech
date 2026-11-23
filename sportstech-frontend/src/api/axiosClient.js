@@ -3,9 +3,7 @@ import { mockData } from './mocks';
 
 const axiosClient = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:4000/api',
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  headers: { 'Content-Type': 'application/json' },
 });
 
 axiosClient.interceptors.request.use(
@@ -24,7 +22,10 @@ axiosClient.interceptors.response.use(
   (error) => {
     if (error.response && error.response.status === 401) {
       localStorage.removeItem('sportstech_token');
-      window.location.href = '/login';
+      // Solo redirigimos si no estamos ya en la página de login
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }
@@ -45,7 +46,6 @@ export const api = {
     return response.data;
   },
 
-  // --- TORNEOS ---
   getTorneos: async () => {
     if (USAR_MOCKS) return new Promise(res => setTimeout(() => res({ data: [{ id: 1, nombre: 'Torneo Apertura 2026' }] }), 500));
     const response = await axiosClient.get('/torneos');
@@ -53,7 +53,7 @@ export const api = {
   },
 
   crearTorneo: async (datos) => {
-    if (USAR_MOCKS) return new Promise(res => setTimeout(() => res({ data: { ok: true, torneo: { id: 2, ...datos } } }), 500));
+    if (USAR_MOCKS) return new Promise(res => setTimeout(() => res({ data: { ok: true } }), 500));
     const response = await axiosClient.post('/torneos', datos);
     return response.data;
   },
@@ -70,12 +70,10 @@ export const api = {
     return response.data;
   },
 
-  // --- PARTIDOS ---
   getPartidos: async (jornada, torneoId = 1) => {
     if (USAR_MOCKS) {
       const partidosMock = [
-        { id: 1, jornada: 2, fechaHora: '2026-11-14T10:00:00', cancha: 'Cancha Central', local: 'Tigres del Barrio', visitante: 'Atlético Ribereño', estado: 'Programado', hora: '10:00' },
-        { id: 2, jornada: 2, fechaHora: '2026-11-14T10:00:00', cancha: 'Cancha El Parque', local: 'Deportivo Los Pinos', visitante: 'Club Los Cacaoteros', estado: 'Falta árbitro', hora: '10:00' }
+        { id: 1, jornada: 2, cancha: 'Cancha Central', local: 'Tigres', visitante: 'Ribereño', estado: 'Programado', hora: '10:00' }
       ];
       return new Promise(res => setTimeout(() => res({ data: partidosMock }), 500));
     }
@@ -96,7 +94,7 @@ export const api = {
 
   getPartidoDetalle: async (id) => {
     if (USAR_MOCKS) {
-      const partidoMock = { id: 1, jornada: 2, cancha: 'Cancha Central', local: 'Tigres del Barrio', visitante: 'Dep. Los Pinos', golesLocal: 3, golesVisitante: 2, eventos: [] };
+      const partidoMock = { id: 1, jornada: 2, cancha: 'Cancha Central', local: 'Tigres', visitante: 'Pinos', golesLocal: 3, golesVisitante: 2, eventos: [] };
       return new Promise(res => setTimeout(() => res({ data: partidoMock }), 500));
     }
     const response = await axiosClient.get(`/partidos/${id}`);
@@ -109,10 +107,9 @@ export const api = {
     return response.data;
   },
 
-  // --- EQUIPOS ---
-  getEquiposConPlantilla: async () => {
+  getEquiposConPlantilla: async (torneoId = 1) => {
     if (USAR_MOCKS) return new Promise(res => setTimeout(() => res({ data: [] }), 500));
-    const response = await axiosClient.get('/equipos');
+    const response = await axiosClient.get(`/equipos?torneo_id=${torneoId}`);
     return response.data; 
   },
 
@@ -134,7 +131,6 @@ export const api = {
     return response.data;
   },
 
-  // --- CATÁLOGOS ---
   getCanchas: async () => {
     if (USAR_MOCKS) return new Promise(res => setTimeout(() => res({ data: [{ id: 1, nombre: 'Cancha Central' }] }), 500));
     const response = await axiosClient.get('/canchas');
@@ -147,7 +143,6 @@ export const api = {
     return response.data;
   },
 
-  // --- FUNCIONES PÚBLICAS (SIN TOKEN) ---
   getPosicionesPublicas: async (slug, torneoId = '') => {
     if (USAR_MOCKS) return new Promise(res => setTimeout(() => res({ data: mockData.posiciones }), 500));
     const url = `/publico/${slug}/posiciones${torneoId ? `?torneo=${torneoId}` : ''}`;

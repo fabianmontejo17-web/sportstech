@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api/axiosClient';
+import { useTorneo } from '../context/TorneoContext';
 import Encabezado from '../components/Encabezado';
 import MenuInferior from '../components/MenuInferior';
 import Boton from '../components/Boton';
@@ -12,17 +13,19 @@ export default function Equipos() {
   const [plantilla, setPlantilla] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
+  
+  const { torneoActivo } = useTorneo(); // Obtenemos el torneo activo
   const navigate = useNavigate();
 
   useEffect(() => {
     const cargarEquipos = async () => {
+      if (!torneoActivo) return;
+      
+      setCargando(true);
       try {
-        const res = await api.getEquiposConPlantilla();
-        
-        // CORRECCIÓN: El backend envía { ok: true, equipos: [...] }
+        // Le pasamos el ID del torneo activo
+        const res = await api.getEquiposConPlantilla(torneoActivo.id);
         const data = res.equipos || res.data || res;
-        
-        // Aseguramos que siempre sea un arreglo
         setEquipos(Array.isArray(data) ? data : []);
       } catch (err) {
         console.error(err);
@@ -32,14 +35,13 @@ export default function Equipos() {
       }
     };
     cargarEquipos();
-  }, []);
+  }, [torneoActivo]);
 
   const verPlantilla = async (equipo) => {
     setEquipoSeleccionado(equipo);
-    setPlantilla([]); // Limpiamos la anterior
+    setPlantilla([]);
     try {
       const res = await api.getPlantilla(equipo.id);
-      // El backend envía { ok: true, jugadores: [...] }
       const data = res.jugadores || res.data || res;
       setPlantilla(Array.isArray(data) ? data : []);
     } catch (err) {
@@ -55,10 +57,12 @@ export default function Equipos() {
       <div className="p-4">
         <Aviso tipo="error" mensaje={error} />
 
-        {cargando ? (
+        {!torneoActivo ? (
+          <p className="font-bold text-center mt-10">Selecciona un torneo en la pestaña de Torneos.</p>
+        ) : cargando ? (
           <p className="font-bold text-center mt-10">Cargando equipos...</p>
         ) : equipos.length === 0 ? (
-          <p className="font-bold text-center mt-10 text-textoSec">No hay equipos registrados.</p>
+          <p className="font-bold text-center mt-10 text-textoSec">No hay equipos registrados en este torneo.</p>
         ) : (
           <div className="space-y-3 mb-8">
             {equipos.map(eq => (
@@ -82,7 +86,7 @@ export default function Equipos() {
           <Boton variante="secundario">+ Nuevo equipo</Boton>
         </Link>
 
-        {/* Sección de Plantilla (solo si hay un equipo seleccionado) */}
+        {/* Sección de Plantilla */}
         {equipoSeleccionado && (
           <div className="mt-8 border-t-[3px] border-texto pt-4">
             <h2 className="text-xl font-bold mb-4">Plantilla · {equipoSeleccionado.nombre}</h2>
@@ -100,7 +104,7 @@ export default function Equipos() {
               )}
             </div>
 
-            <Link to={`/admin/jugadores/nuevo?equipoId=${equipoSeleccionado.id}&equipoNombre=${equipoSeleccionado.nombre}`} className="block">
+            <Link to={`/admin/jugadores/nuevo?equipoId=${equipoSeleccionado.id}&equipoNombre=${equipoSeleccionado.nombre}&torneoId=${torneoActivo.id}`} className="block">
               <Boton variante="resalte">+ Agregar jugador</Boton>
             </Link>
           </div>
